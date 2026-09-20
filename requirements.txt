@@ -2,6 +2,7 @@ streamlit==1.28.0
 openai-whisper
 moviepy==1.0.3
 pillow
-numpy
+numpy==1.24.3
 imageio
 imageio-ffmpeg
+setuptools
