@@ -1,6 +1,6 @@
 import streamlit as st
 
-# ============ PAGE CONFIG (Pehle aana chahiye) ============
+# ============ PAGE CONFIG ============
 st.set_page_config(
     page_title="AI Video Editor VIP",
     page_icon="🎬",
@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 # ============ IMPORTS ============
-import whisper
+from faster_whisper import WhisperModel
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
@@ -42,7 +42,6 @@ st.markdown("""
     .stButton > button:hover {
         transform: translateY(-3px) scale(1.02);
         box-shadow: 0 15px 35px rgba(245,87,108,0.7);
-        background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
     }
     .stTabs [data-baseweb="tab-list"] {
         gap: 15px;
@@ -73,14 +72,6 @@ st.markdown("""
         background: rgba(255,255,255,0.9);
         padding: 12px;
     }
-    .stSuccess, .stInfo {
-        border-radius: 15px;
-        border-left: 5px solid #00ff88;
-    }
-    .stSelectbox > div > div {
-        border-radius: 15px;
-        background: rgba(255,255,255,0.95);
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,7 +95,9 @@ if 'video_path' not in st.session_state:
 if 'bg_path' not in st.session_state:
     st.session_state.bg_path = None
 if 'template' not in st.session_state:
-    st.session_state.template = {"color": "#00FF00", "style": "box"}
+    st.session_state.template = {"color": "#00FF00"}
+if 'bg_color' not in st.session_state:
+    st.session_state.bg_color = "#1a1a2e"
 
 # ============ TABS ============
 tab1, tab2, tab3 = st.tabs(["📹 Video Upload", "🎨 Templates", "🖼️ Background"])
@@ -122,7 +115,6 @@ with tab1:
         temp_video = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         temp_video.write(video_file.read())
         st.session_state.video_path = temp_video.name
-        
         st.success("✅ Video uploaded successfully!")
         st.video(st.session_state.video_path)
     
@@ -133,31 +125,34 @@ with tab1:
     with col1:
         language = st.selectbox("Language", ["en", "ur", "hi", "ar"], index=0)
     with col2:
-        model_size = st.selectbox("AI Model (bigger = better)", ["tiny", "base", "small"], index=1)
+        model_size = st.selectbox("AI Model", ["tiny", "base", "small"], index=1)
     
     if st.button("🚀 GENERATE CAPTIONS", key="gen_cap"):
         if st.session_state.video_path:
             with st.spinner("🎤 AI sun raha hai... Captions ban rahe hain..."):
-                model = whisper.load_model(model_size)
-                result = model.transcribe(
-                    st.session_state.video_path,
-                    language=language,
-                    word_timestamps=True
-                )
-                
-                all_words = []
-                for seg in result["segments"]:
-                    if "words" in seg:
-                        for w in seg["words"]:
-                            all_words.append({
-                                "word": w["word"].strip(),
-                                "start": w["start"],
-                                "end": w["end"]
-                            })
-                
-                st.session_state.captions = all_words
-                st.success(f"✅ {len(all_words)} words ke captions ban gaye!")
-                st.rerun()
+                try:
+                    model = WhisperModel(model_size, device="cpu", compute_type="int8")
+                    segments, info = model.transcribe(
+                        st.session_state.video_path,
+                        language=language,
+                        word_timestamps=True
+                    )
+                    
+                    all_words = []
+                    for seg in segments:
+                        if seg.words:
+                            for w in seg.words:
+                                all_words.append({
+                                    "word": w.word.strip(),
+                                    "start": w.start,
+                                    "end": w.end
+                                })
+                    
+                    st.session_state.captions = all_words
+                    st.success(f"✅ {len(all_words)} words ke captions ban gaye!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
         else:
             st.error("❌ Pehle video upload karo!")
     
@@ -168,7 +163,7 @@ with tab1:
         st.info("💡 Yahan captions ko theek kar sakte ho")
         
         edited = []
-        for i, cap in enumerate(st.session_state.captions[:50]):
+        for i, cap in enumerate(st.session_state.captions[:30]):
             col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
                 new_word = st.text_input(
@@ -193,7 +188,6 @@ with tab1:
 # ---- TAB 2: TEMPLATES ----
 with tab2:
     st.markdown("### 🎨 Choose Caption Template")
-    st.write("Apna pasandeeda style choose karo:")
     
     templates = {
         "neon_green": {"name": "🟢 Neon Green", "color": "#00FF00"},
@@ -239,7 +233,7 @@ with tab3:
     
     bg_type = st.radio(
         "Background Type:",
-        ["🖼️ Custom Image", "🎨 Solid Color", "🌫️ Blur Video"],
+        ["🖼️ Custom Image", "🎨 Solid Color"],
         horizontal=True
     )
     
@@ -256,7 +250,7 @@ with tab3:
             st.image(st.session_state.bg_path, caption="Your Background", use_column_width=True)
             st.success("✅ Background set!")
     
-    elif bg_type == "🎨 Solid Color":
+    else:
         color = st.color_picker("Pick a color", "#1a1a2e")
         st.session_state.bg_color = color
         st.markdown(f"""
@@ -264,16 +258,10 @@ with tab3:
                     border: 3px solid white; box-shadow: 0 0 30px {color};'>
         </div>
         """, unsafe_allow_html=True)
-    
-    else:
-        st.info("🌫️ Video ka blurred version background banega")
-        st.session_state.bg_blur = True
 
 # ============ EXPORT BUTTON ============
 st.markdown("---")
-st.markdown("""
-<h2 style='text-align: center;'>🎬 Ready to Export?</h2>
-""", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center;'>🎬 Ready to Export?</h2>", unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
@@ -296,7 +284,7 @@ with col2:
                     video_resized = video_resized.set_position(("center", "top"))
                     
                     captions = st.session_state.captions
-                    template = st.session_state.get('template', {"color": "#00FF00"})
+                    template = st.session_state.template
                     
                     caption_clips = []
                     chunk_size = 4
@@ -310,7 +298,14 @@ with col2:
                             if word_data["start"] > 420:
                                 break
                             
-                            bg = Image.new('RGB', (target_w, target_h), (26, 26, 46))
+                            # Background image ya color
+                            if st.session_state.bg_path:
+                                bg_img = Image.open(st.session_state.bg_path).convert("RGB")
+                                bg_img = bg_img.resize((target_w, target_h))
+                                bg = bg_img.copy()
+                            else:
+                                bg = Image.new('RGB', (target_w, target_h), st.session_state.bg_color)
+                            
                             draw = ImageDraw.Draw(bg)
                             
                             try:
@@ -349,11 +344,11 @@ with col2:
                     output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
                     final.write_videofile(
                         output,
-                        fps=30,
+                        fps=24,
                         codec="libx264",
                         audio_codec="aac",
                         preset="ultrafast",
-                        threads=4,
+                        threads=2,
                         logger=None
                     )
                     
@@ -371,10 +366,5 @@ with col2:
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
 
-# Footer
 st.markdown("---")
-st.markdown("""
-<p style='text-align: center; color: white; opacity: 0.7;'>
-    Made with ❤️ using Streamlit + Whisper AI
-</p>
-""", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: white; opacity: 0.7;'>Made with ❤️ using Streamlit</p>", unsafe_allow_html=True)
