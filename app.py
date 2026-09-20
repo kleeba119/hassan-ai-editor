@@ -1,6 +1,6 @@
 import streamlit as st
 import whisper
-from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
+from moviepy import VideoFileClip, ImageClip, CompositeVideoClip
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import os
