@@ -1,12 +1,6 @@
 import streamlit as st
-import whisper
-from moviepy import VideoFileClip, ImageClip, CompositeVideoClip
-from PIL import Image, ImageDraw, ImageFont
-import numpy as np
-import os
-import tempfile
 
-# ============ PAGE CONFIG ============
+# ============ PAGE CONFIG (Pehle aana chahiye) ============
 st.set_page_config(
     page_title="AI Video Editor VIP",
     page_icon="🎬",
@@ -14,22 +8,25 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# ============ IMPORTS ============
+import whisper
+from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
+from PIL import Image, ImageDraw, ImageFont
+import numpy as np
+import os
+import tempfile
+
 # ============ CUSTOM CSS (VIP UI) ============
 st.markdown("""
 <style>
-    /* Main background gradient */
     .stApp {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
-    
-    /* Headers */
     h1, h2, h3 {
         color: white !important;
         font-family: 'Poppins', sans-serif;
         text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
     }
-    
-    /* Buttons */
     .stButton > button {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         color: white;
@@ -42,21 +39,17 @@ st.markdown("""
         transition: all 0.3s ease;
         width: 100%;
     }
-    
     .stButton > button:hover {
         transform: translateY(-3px) scale(1.02);
         box-shadow: 0 15px 35px rgba(245,87,108,0.7);
         background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
     }
-    
-    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 15px;
         background: rgba(255,255,255,0.1);
         padding: 10px;
         border-radius: 50px;
     }
-    
     .stTabs [data-baseweb="tab"] {
         background: transparent;
         border-radius: 50px;
@@ -64,35 +57,26 @@ st.markdown("""
         padding: 10px 30px;
         font-weight: bold;
     }
-    
     .stTabs [aria-selected="true"] {
         background: linear-gradient(135deg, #f093fb, #f5576c);
         box-shadow: 0 5px 20px rgba(245,87,108,0.5);
     }
-    
-    /* File uploader */
     .stFileUploader {
         background: rgba(255,255,255,0.1);
         border-radius: 20px;
         padding: 20px;
         border: 2px dashed rgba(255,255,255,0.4);
     }
-    
-    /* Text inputs */
     .stTextInput > div > div > input {
         border-radius: 15px;
         border: 2px solid rgba(255,255,255,0.3);
         background: rgba(255,255,255,0.9);
         padding: 12px;
     }
-    
-    /* Success/Info boxes */
     .stSuccess, .stInfo {
         border-radius: 15px;
         border-left: 5px solid #00ff88;
     }
-    
-    /* Selectbox */
     .stSelectbox > div > div {
         border-radius: 15px;
         background: rgba(255,255,255,0.95);
@@ -119,6 +103,8 @@ if 'video_path' not in st.session_state:
     st.session_state.video_path = None
 if 'bg_path' not in st.session_state:
     st.session_state.bg_path = None
+if 'template' not in st.session_state:
+    st.session_state.template = {"color": "#00FF00", "style": "box"}
 
 # ============ TABS ============
 tab1, tab2, tab3 = st.tabs(["📹 Video Upload", "🎨 Templates", "🖼️ Background"])
@@ -133,7 +119,6 @@ with tab1:
     )
     
     if video_file:
-        # Save to temp
         temp_video = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         temp_video.write(video_file.read())
         st.session_state.video_path = temp_video.name
@@ -160,7 +145,6 @@ with tab1:
                     word_timestamps=True
                 )
                 
-                # Words nikaalo
                 all_words = []
                 for seg in result["segments"]:
                     if "words" in seg:
@@ -183,9 +167,8 @@ with tab1:
         st.markdown("### ✏️ Edit Captions")
         st.info("💡 Yahan captions ko theek kar sakte ho")
         
-        # Har word edit karne ka option
         edited = []
-        for i, cap in enumerate(st.session_state.captions[:50]):  # First 50
+        for i, cap in enumerate(st.session_state.captions[:50]):
             col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
                 new_word = st.text_input(
@@ -212,16 +195,15 @@ with tab2:
     st.markdown("### 🎨 Choose Caption Template")
     st.write("Apna pasandeeda style choose karo:")
     
-    # Template grid
     templates = {
-        "neon_green": {"name": "🟢 Neon Green", "color": "#00FF00", "style": "box"},
-        "neon_pink": {"name": "🩷 Neon Pink", "color": "#FF00FF", "style": "box"},
-        "neon_yellow": {"name": "🟡 Neon Yellow", "color": "#FFFF00", "style": "glow"},
-        "neon_cyan": {"name": "🔵 Neon Cyan", "color": "#00FFFF", "style": "box"},
-        "white_bold": {"name": "⚪ White Bold", "color": "#FFFFFF", "style": "outline"},
-        "orange_pop": {"name": "🟠 Orange Pop", "color": "#FF6600", "style": "box"},
-        "purple_glow": {"name": "💜 Purple Glow", "color": "#BF00FF", "style": "glow"},
-        "red_alert": {"name": "🔴 Red Alert", "color": "#FF0000", "style": "box"},
+        "neon_green": {"name": "🟢 Neon Green", "color": "#00FF00"},
+        "neon_pink": {"name": "🩷 Neon Pink", "color": "#FF00FF"},
+        "neon_yellow": {"name": "🟡 Neon Yellow", "color": "#FFFF00"},
+        "neon_cyan": {"name": "🔵 Neon Cyan", "color": "#00FFFF"},
+        "white_bold": {"name": "⚪ White Bold", "color": "#FFFFFF"},
+        "orange_pop": {"name": "🟠 Orange Pop", "color": "#FF6600"},
+        "purple_glow": {"name": "💜 Purple Glow", "color": "#BF00FF"},
+        "red_alert": {"name": "🔴 Red Alert", "color": "#FF0000"},
     }
     
     cols = st.columns(4)
@@ -303,26 +285,19 @@ with col2:
         else:
             with st.spinner("🎬 Video ban rahi hai... 3-5 minute lagenge..."):
                 try:
-                    # Video load
                     video = VideoFileClip(st.session_state.video_path)
                     
-                    # 7 min limit
                     if video.duration > 420:
                         video = video.subclip(0, 420)
                     
-                    # 9:16 ratio
                     target_w, target_h = 1080, 1920
                     video_h = int(target_h * 0.45)
                     video_resized = video.resize(height=video_h)
                     video_resized = video_resized.set_position(("center", "top"))
                     
-                    # Caption frames banao
                     captions = st.session_state.captions
-                    template = st.session_state.get('template', {
-                        "color": "#00FF00", "style": "box"
-                    })
+                    template = st.session_state.get('template', {"color": "#00FF00"})
                     
-                    # Simple caption overlay (basic version)
                     caption_clips = []
                     chunk_size = 4
                     
@@ -335,11 +310,9 @@ with col2:
                             if word_data["start"] > 420:
                                 break
                             
-                            # Frame banao
                             bg = Image.new('RGB', (target_w, target_h), (26, 26, 46))
                             draw = ImageDraw.Draw(bg)
                             
-                            # Font
                             try:
                                 font = ImageFont.truetype(
                                     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -348,14 +321,12 @@ with col2:
                             except:
                                 font = ImageFont.load_default()
                             
-                            # Text position
                             text = word_data["word"]
                             bbox = draw.textbbox((0, 0), text, font=font)
                             tw = bbox[2] - bbox[0]
                             x = (target_w - tw) // 2
                             y = int(target_h * 0.70)
                             
-                            # Draw with highlight
                             draw.text(
                                 (x, y), text,
                                 font=font,
@@ -370,13 +341,11 @@ with col2:
                                     .set_end(min(word_data["end"], 420)))
                             caption_clips.append(clip)
                     
-                    # Composite
                     final = CompositeVideoClip(
                         caption_clips + [video_resized],
                         size=(target_w, target_h)
                     ).set_duration(video_resized.duration)
                     
-                    # Export
                     output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
                     final.write_videofile(
                         output,
